@@ -18,6 +18,17 @@ from sign up and login to a basic dashboard. All pages are located in the
 Open `frontend/index.html` in a modern web browser to try out the flow. The demo
 stores data in your browser's local storage and requires no backend.
 
+### Running the Frontend
+
+To serve the static files from a local server:
+
+```bash
+cd frontend
+python -m http.server 8000
+```
+
+Then visit `http://localhost:8000/index.html` in your browser.
+
 # TuckData Test Data Generator
 
 This repository provides a minimal Flask application for generating test data via OpenAI. The app includes simple account management, wallet tracking, secret key creation and an API endpoint that proxies OpenAI requests. Stripe integration is stubbed for simplicity.
