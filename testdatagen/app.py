@@ -11,11 +11,16 @@ import stripe
 import os
 
 app = Flask(__name__)
-app.config['MONGO_URI'] = os.environ.get('MONGO_URI', 'mongodb://localhost:27017/testdatagen')
+app.config['MONGO_URI'] = os.environ.get(
+    'MONGO_URI', 'mongodb://localhost:27017/testdatagen'
+)
 app.config['SECRET_KEY'] = os.environ.get('JWT_SECRET', 'change-me')
 app.config['OPENAI_PRICE_MULTIPLIER'] = 3
 app.config['OPENAI_API_KEY'] = 'YOUR_OPENAI_KEY'
 app.config['STRIPE_SECRET_KEY'] = 'YOUR_STRIPE_SECRET_KEY'
+app.config['ACCESS_TOKEN_EXPIRES_MINUTES'] = int(
+    os.environ.get('ACCESS_TOKEN_EXPIRES_MINUTES', '60')
+)
 stripe.api_key = app.config['STRIPE_SECRET_KEY']
 
 mongo_client = MongoClient(app.config['MONGO_URI'])
@@ -68,21 +73,61 @@ def login():
     user = mongo_db.users.find_one({'username': username})
     if not user or not check_password_hash(user['password_hash'], password):
         return jsonify({'error': 'invalid credentials'}), 401
+    access_exp = datetime.datetime.utcnow() + datetime.timedelta(
+        minutes=app.config['ACCESS_TOKEN_EXPIRES_MINUTES']
+    )
     token = jwt.encode(
+        {'user_id': str(user['_id']), 'exp': access_exp},
+        app.config['SECRET_KEY'],
+        algorithm='HS256',
+    )
+    refresh_token = jwt.encode(
         {
             'user_id': str(user['_id']),
-            'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=1)
+            'type': 'refresh',
+            'exp': datetime.datetime.utcnow() + datetime.timedelta(days=30),
         },
         app.config['SECRET_KEY'],
-        algorithm='HS256'
+        algorithm='HS256',
     )
-    return jsonify({'token': token})
+    return jsonify({'token': token, 'refresh_token': refresh_token})
 
 @app.route('/logout', methods=['POST'])
 @login_required
 def logout():
     # With JWTs there is no server-side session to invalidate
     return jsonify({'message': 'logged out'})
+
+
+@app.route('/refresh', methods=['POST'])
+def refresh():
+    """Issue a new access token using a refresh token."""
+    data = request.json or {}
+    token = data.get('refresh_token')
+    if not token:
+        return jsonify({'error': 'missing refresh token'}), 400
+    try:
+        payload = jwt.decode(
+            token,
+            app.config['SECRET_KEY'],
+            algorithms=['HS256'],
+        )
+        if payload.get('type') != 'refresh':
+            raise jwt.InvalidTokenError('wrong token type')
+    except jwt.ExpiredSignatureError:
+        return jsonify({'error': 'refresh token expired'}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({'error': 'invalid token'}), 401
+
+    access_exp = datetime.datetime.utcnow() + datetime.timedelta(
+        minutes=app.config['ACCESS_TOKEN_EXPIRES_MINUTES']
+    )
+    new_token = jwt.encode(
+        {'user_id': payload['user_id'], 'exp': access_exp},
+        app.config['SECRET_KEY'],
+        algorithm='HS256',
+    )
+    return jsonify({'token': new_token})
 
 @app.route('/secret', methods=['POST'])
 @login_required

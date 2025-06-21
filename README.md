@@ -38,6 +38,8 @@ This repository provides a minimal Flask application for generating test data vi
 - **Register/Login/Logout**: Account management stored in MongoDB.
 - **Secret Keys**: Users can create multiple API keys used for authentication.
 - **JWT Sessions**: Login responses include a JWT that must be sent in the `Authorization` header.
+- **Refresh Tokens**: A `/refresh` endpoint issues new JWTs so sessions can stay
+  active.
 - **Wallet**: Deposits update a user's wallet balance. Charges are applied when generating data.
 - **OpenAI Proxy**: Requests to OpenAI are forwarded and usage is recorded. Costs are multiplied by a configurable factor.
 - **Usage Tracking**: Each request stores token usage and cost so users can review their spending.
@@ -60,6 +62,7 @@ python testdatagen/app.py
 3. The API will be available at `http://localhost:5000`.
    The application expects a running MongoDB instance. Configure the connection
    by setting the `MONGO_URI` environment variable. You can also override the
-   JWT signing key with `JWT_SECRET`.
+   JWT signing key with `JWT_SECRET`. The access token lifetime can be adjusted
+   with `ACCESS_TOKEN_EXPIRES_MINUTES` (default is 60 minutes).
 
 See `testdatagen/app.py` for endpoint details.
